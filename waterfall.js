@@ -333,8 +333,12 @@ define(["jquery", "text!./waterfall.css", "./d3.min"], function ($, css) {
             var max = d3.max(data, function (d) {
                 return d.sum
             }) * 1.05;
+            max = (max < 0 ? 0 : max);
 
-            var min = 0;
+            var min =  d3.min(data, function(d) { return d.value });             
+            min = (totalsum > min ? totalsum : min);
+            min = (totalsum > 0 ? 0 : totalsum);
+            min = (min > 0 ? 0 : min);
 
             var xScale = d3.scale.ordinal()
                 .rangeRoundBands([0, width])
@@ -352,15 +356,12 @@ define(["jquery", "text!./waterfall.css", "./d3.min"], function ($, css) {
                 rotateLabels = false;
             };
 
-            var height = $element.height() - margins.top - margins.bottom;
-
-            var yScale = d3.scale.linear()
-                .domain([min, max])
-                .range([min, height]);
+            var height = $element.height() - margins.top - margins.bottom;              
 
             var y = d3.scale.linear()
                 .domain([min, max])
-                .range([height, min]);
+                .range([height, 0])
+                .nice();
 
             var yScaleOffset = d3.scale.linear()
                 .domain([0, max])
@@ -368,9 +369,9 @@ define(["jquery", "text!./waterfall.css", "./d3.min"], function ($, css) {
 
             var yAxis = d3.svg.axis()
                 .scale(y)
-                .orient("left")
-                //.tickFormat(d3.format("s"))
-                .tickFormat(formatScale);
+                .orient("left")                
+                .tickFormat(formatScale);           
+            
             var xAxis = d3.svg.axis()
                 .scale(xScale)
                 .orient("bottom");
@@ -400,22 +401,24 @@ define(["jquery", "text!./waterfall.css", "./d3.min"], function ($, css) {
                 .attr("y", function (d, i) {
                     if (invert) {
                         if (d.label === layout.waterfall.totalLabel) {
-                            return (d.value < 0) ? height - yScale(d.sum - d.value) : height - yScale(d.sum);
+                            return (d.value < 0) ? y(d.sum - d.value) : y(d.sum);
                         } else if (useTotal && reverse ? i == 1 : i == 0) {
-                            return height - yScale(totalsum);
+                            return height - y(totalsum);
                         } else {
-                            return height - yScale(totalsum) + yScale(data[i - 1].sum);
+                            return height - y(totalsum) + y(data[i - 1].sum);
                         }
                     } else {
-                        return (d.value < 0) ? height - yScale(d.sum - d.value) : height - yScale(d.sum);
+                        return (d.value < 0) ? y(d.sum - d.value) : y(d.sum);
                     };
                 })
                 .attr("width", xScale.rangeBand())
                 .attr("height", function (d, i) {
                     if (useOffest && i === 0) {
-                        return yScale(Math.abs(d.value)) - yScale(offsetBy);
+                        //return yScale(Math.abs(d.value)) - yScale(offsetBy);                        
+                        return Math.abs(y(d.value) - y(offsetBy));
                     }
-                    return yScale(Math.abs(d.value));
+                    //return yScale(Math.abs(d.value));                                    
+                    return Math.abs(y(d.value) - y(0));
                 })
                 .style('fill', function (d) {
                     if (d.label === layout.waterfall.totalLabel) return layout.waterfall.totalcolor;
@@ -439,15 +442,15 @@ define(["jquery", "text!./waterfall.css", "./d3.min"], function ($, css) {
                 .attr("y", function (d, i) {
                     if (invert) {
                         if (d.label === layout.waterfall.totalLabel) {
-                            return (d.value < 0) ? height - yScale(d.sum - d.value) : height - yScale(d.sum);
+                            return (d.value < 0) ? y(d.sum - d.value) : y(d.sum);
                         } else if (useTotal && reverse ? i == 1 : i == 0) {
-                            return height - yScale(totalsum);
+                            return height - y(totalsum);
                         } else {
-                            return height - yScale(totalsum) + yScale(data[i - 1].sum);
+                            return height - y(totalsum) + y(data[i - 1].sum);
                         }
                     } else {
-                        return (d.value < 0) ? height - yScale(d.sum - d.value) : height - yScale(d.sum);
-                    };
+                        return (d.value < 0) ? y(d.sum - d.value) : y(d.sum);
+                    };                   
                 })
                 .attr('dy', -5)
                 .attr('text-anchor', 'middle')
@@ -480,6 +483,15 @@ define(["jquery", "text!./waterfall.css", "./d3.min"], function ($, css) {
                     });
             };
 
+            svg.append("g")
+                .attr("class", "xaxis axis")
+                .append("line")
+                .style("stroke-dasharray", ("3, 3"))
+                .attr("y1", y(0))
+                .attr("y2", y(0))
+                .attr("x2", width);
+
+            
             function handleClick(d, i) {
                 //Break if in edit mode.
                 if (that.$scope.$parent.$parent.editmode) return;
